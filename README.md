@@ -1,5 +1,5 @@
 # dust-serve
-
+![CI 状态](https://github.com/haohaiwei/dust-serve/actions/workflows/rust.yml/badge.svg)
 文件系统快速扫描工具，基于dust 提供Web 前端 + 扫描管理 API, 扫描 + ClickHouse 文件索引方案提供服务层。
 
 ## 架构
