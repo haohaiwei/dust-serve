@@ -1,0 +1,16 @@
+<!-- Override ClickHouse logger defaults to prevent disk exhaustion.
+     The stock image ships <level>trace</level> (every operation logged) with
+     <size>1000M</size> <count>10</count> (up to 10 GB of log files). Under a
+     2.8B-row scan that floods both the server log files AND the Docker
+     container json log (which captures stdout/stderr). This drops the level
+     to warning and caps total log files at 3×100M = 300 MB.
+     See: https://clickhouse.com/docs/en/operations/server-configuration-parameters/server-settings#logger -->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+        <size>100M</size>
+        <count>3</count>
+    </logger>
+</clickhouse>

@@ -1,0 +1,14 @@
+# dust-serve configuration. Copy to dust-serve.toml and edit, or use env vars.
+
+listen = "0.0.0.0:8080"
+dust_path = "dust"          # path to the dust binary
+ch_url = "http://localhost:8123"
+ch_read_user = "readonly"
+ch_read_password = "readonly"
+ch_write_user = "dust_writer"
+ch_write_password = "changeme"
+ch_table = "file_scan"
+web_dir = "web/dist"         # built frontend (npm run build)
+jwt_secret = "change-me-to-a-long-random-string"
+admin_user = "admin"
+admin_password = "changeme"

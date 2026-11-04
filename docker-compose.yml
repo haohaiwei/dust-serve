@@ -1,0 +1,91 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: admin123
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      # Bind mount: CH data lives in ./data/clickhouse on the host (inspectable,
+      # easy to back up / migrate). The ClickHouse image fixes ownership on start.
+      - ./data/clickhouse:/var/lib/clickhouse
+      # Override the stock log-level (trace) + rotation (10×1000M = 10GB) to
+      # warning + 3×100M = 300MB. Prevents disk exhaustion under large scans.
+      - ./clickhouse-config.d:/etc/clickhouse-server/config.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    # Cap Docker container logs (json-file driver defaults to unlimited).
+    # ClickHouse at warning level is quiet, but this is a hard ceiling so a
+    # runaway loop can never fill the host disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # One-shot init: creates the file_scan table, dust_users table, and the
+  # readonly / dust_writer accounts. Runs as admin (full access) once CH is up.
+  ch-init:
+    image: clickhouse/clickhouse-server:latest
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./setup.sql:/setup.sql:ro
+    entrypoint: >
+      bash -c "clickhouse-client --host clickhouse --user admin --password admin123 --multiquery < /setup.sql && echo 'init done'"
+    restart: "no"
+
+  dust-serve:
+    image: dust-serve:latest
+    build:
+      context: .          # self-contained: build from this dust-serve dir
+      dockerfile: Dockerfile
+    depends_on:
+      ch-init:
+        condition: service_completed_successfully
+    environment:
+      LISTEN: 0.0.0.0:8080
+      CH_URL: http://clickhouse:8123
+      CH_READ_USER: readonly
+      CH_READ_PASSWORD: readonly
+      CH_WRITE_USER: dust_writer
+      CH_WRITE_PASSWORD: changeme
+      CH_TABLE: file_scan
+      WEB_DIR: /app/web/dist
+      SCAN_LOG_DIR: /app/scan_logs
+      DUST_PATH: /app/dust
+      # Comma-separated directory names to exclude from scans (e.g. snapshot dirs).
+      EXCLUDE_DIRS: .snapshot
+      JWT_SECRET: change-me-to-a-long-random-string-in-production
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: changeme
+    ports:
+      - "8080:8080"
+    volumes:
+      # Scan logs in ./scan-logs on the host (inspectable).
+      - ./scan-logs:/app/scan_logs
+      # Mount the host root read-only so dust can scan host paths inside the
+      # container. The path you scan on the web must be the in-container path,
+      # e.g. scan "/host/data" to scan the host's /data. Add more mounts for
+      # other roots, or change /host to your actual storage root.
+      - /abc:/abc:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+# No named volumes needed — data lives in host bind-mount directories
+# (./data/clickhouse, ./scan-logs), which are auto-created on first up.
