@@ -230,3 +230,5 @@ docker run -d -p 8080:8080 \
   -v /abc:/abc:ro \
   dust-serve
 ```
+## UI
+<img width="2263" height="269" alt="image" src="https://github.com/user-attachments/assets/76802bfd-050b-4e69-a234-a0b9a7db32f9" />
